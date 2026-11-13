@@ -21,13 +21,13 @@ description: 决策 Agent 专用：把任务拆成子任务，用 agent-autoloop
 `workbuddy-global/…` 为国际版，由本机 `dsh-connect-workbuddy` 插件注册）。你只决定事件 `type`，
 内核按 `type` 把这一轮派给对应规则，那条规则用哪个模型由 `rules.json` 写死，不由你决定。
 
-| 任务性质 | 回执里的 `type` | 派给的规则 / 模型 |
-|---|---|---|
-| 写代码 / 改仓库 / 跑测试 / 审查 diff | `task.wb` | 派给 WorkBuddy → `workbuddy/DeepSeek-V4-Pro` |
-| 大上下文代码理解、长文分析 | `task.qoder` | 派给 Qoder → `workbuddy-global/Kimi-K3` |
-| 办公文档、会议纪要、日程、邮件、IM 消息整理 | `task.loomy` | 派给 Loomy → `workbuddy-global/GPT-5.6` |
+| 任务性质                                    | 回执里的 `type` | 派给的规则 / 模型                           |
+| ------------------------------------------- | --------------- | ------------------------------------------- |
+| 写代码 / 改仓库 / 跑测试 / 审查 diff        | `task.wb`       | 派给 WorkBuddy → `workbuddy/hy3`            |
+| 大上下文代码理解、长文分析                  | `task.qoder`    | 派给 Qoder → `workbuddy/glm-5.3-flash`      |
+| 办公文档、会议纪要、日程、邮件、IM 消息整理 | `task.loomy`    | 派给 Loomy → `workbuddy/minimax-m3.1-flash` |
 
-（决策这一轮自己用 `workbuddy/GLM-5.3`。模型名只是示例，以 DSH 模型选择器里实际有的为准。）
+（决策这一轮自己用 `workbuddy/hy4free`。倍率：hy4free/hy3 x0、glm-5.3-flash 与 minimax-m3.1-flash x0.08；模型名与倍率以上游目录为准，会变。）
 
 拿不准、或需要删数据/花钱/对外发消息时：不要派活，用 `ask` 把选项写清楚交本人拍板。
 

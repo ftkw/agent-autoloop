@@ -2,11 +2,11 @@
 
 WorkBuddy 模型由本机已装的 `dsh-connect-workbuddy` 插件注册进 DSH（`workbuddy` 国内版 /
 `workbuddy-global` 国际版）。本例用 **autoloop 内置 `dsh` 插件的 `model` 字段**给每个 Agent
-指定模型：决策一轮用国内版 GLM-5.3，三条干活规则分别用国内版 DeepSeek-V4-Pro、国际版 Kimi-K3、
-国际版 GPT-5.6。全部是同一个 `dsh` 二进制，只是每轮带不同的 `--patch` 覆盖默认模型。
+指定模型：决策一轮用 `hy4free`（x0 限时免费），三条干活规则分别用 `hy3`（x0 免费）、
+`glm-5.3-flash`（x0.08）、`minimax-m3.1-flash`（x0.08）——都是低倍率模型，跑起来几乎不花积分。全部是同一个 `dsh` 二进制，只是每轮带不同的 `--patch` 覆盖默认模型。
 
 用前把 `/绝对路径/work`、`worker` 名换成自己的，再：
-  agent-autoloop check examples/recipes/dispatcher/rules.json
+agent-autoloop check examples/recipes/dispatcher/rules.json
 
 ## 相对上游 autoloop 的改造
 
@@ -18,9 +18,10 @@ WorkBuddy 模型由本机已装的 `dsh-connect-workbuddy` 插件注册进 DSH�
 - 没写 `model` 时命令与改造前**逐字相同**，老配置不受影响；
 - 会话续接（`--session-id`）照旧带 patch：patch 只设定新会话的默认模型，不会改掉已有会话的模型。
 
-`--patch` 必须是 launcher flag：放在 `headless` 之前、`--json` 之前。实测（DSH 0.2.1-rc.5）
-`dsh headless --patch p.yml --json "hi"` 生效，`dsh --profile headless --json --patch p.yml "hi"`
-报 `unknown option '--patch'`。patch 只写 `model` 会把默认 `provider` 冲掉，所以只在写了
+`--patch` 必须紧跟 profile 名：`dsh headless --patch p.yml --json …`。0.2.2-rc.3 的解析器在见到
+第一个 app flag（`--json`）后就把余下参数全交给 app，`--patch` 排在 `--json` 之后会被拒收。
+（0.2.1 相反：`--patch` 只能放在 `headless` 之前；但 0.2.1 的 headless 没有
+`--permission-mode`，本插件在 0.2.1 上本来就跑不了。）patch 只写 `model` 会把默认 `provider` 冲掉，所以只在写了
 `provider` 时才输出 provider 行。
 
 ## 机制
@@ -49,6 +50,9 @@ WorkBuddy 模型由本机已装的 `dsh-connect-workbuddy` 插件注册进 DSH�
 - `receipt-example.mjs` → 三条 `task.*` 事件都能通过 `parseEvent`、命中 `emits` 白名单、
   各派给唯一一个 Agent
 - 四个 Agent 各自生成不同的 `dsh-model.yml`（provider + model 均不同）
+- **0.2.2-rc.3 真机端到端已跑通**：隔离 headless profile（base+headless+workbuddy 三个 bundle，
+  复用 desktop 的 workbuddy-vault 凭据与 lastCatalog）下，经本插件 adapter 真实跑通
+  新会话（hy3 回答「收到」+ usage）与 `--session-id` 续接（同一 session 再答，会话保持原模型）
 - 真实 DSH 侧：`--patch` 覆盖 `agent-default-model` 后 `--dump-config` 生效；启动后报
   `NO_ADAPTER: no adapter registered for provider "workbuddy"` 恰好证明模型选择真的被换掉了
   （临时 HOME 里没装插件，所以找不到该 provider）

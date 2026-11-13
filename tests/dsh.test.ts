@@ -98,9 +98,10 @@ test("DSH: a rule's model becomes a --patch overlay, and a round with no model k
     ]);
     // A bare model id keeps DSH's default provider: the patch must not write a provider line.
     const bare = dsh.command({ ...turn, folder, model: "GLM-5.3" });
-    assert.deepEqual(bare.slice(0, 3), [program, "--patch", join(folder, "dsh-model.yml")]);
-    assert.deepEqual(bare.slice(3), [
-      "headless",
+    assert.deepEqual(bare.slice(0, 2), [program, "headless"]);
+    assert.deepEqual(bare.slice(2), [
+      "--patch",
+      join(folder, "dsh-model.yml"),
       "--json",
       "--permission-mode",
       "workspace-write",
@@ -121,7 +122,7 @@ test("DSH: a rule's model becomes a --patch overlay, and a round with no model k
     );
     // A resumed round carries the same patch: it only sets a new session's default, so it cannot change the model.
     const resumed = dsh.command({ ...turn, folder, model: "workbuddy/GLM-5.3", resume: "session-1" });
-    assert.deepEqual(resumed.slice(0, 3), [program, "--patch", join(folder, "dsh-model.yml")]);
+    assert.equal(resumed.indexOf("--patch") > resumed.indexOf("headless"), true, "patch follows the profile name");
     assert.deepEqual(resumed.slice(-3), ["--session-id", "session-1", "做这件事"]);
   } finally {
     rmSync(folder, { recursive: true, force: true });

@@ -63,8 +63,10 @@ function stepUsage(reported: any): Usage | undefined {
 export default {
   command: (turn) => {
     const selection = modelOf(turn.model);
-    // --patch is a launcher flag: it goes before `headless` and before the headless app's own --json.
-    // Without a model the command is exactly what it was, so existing installs keep working untouched.
+    // --patch sits right after the profile name (dsh headless --patch … --json …): the launcher stops
+    // parsing its own flags at the first app flag it sees, so anything past --json reaches --patch only
+    // as an app option, which headless rejects. On 0.2.1 an in-app --patch doesn't exist at all — but
+    // 0.2.1 also lacks --permission-mode, so this plugin never ran there in the first place.
     const patch = selection
       ? (() => {
           const file = path.join(turn.folder, "dsh-model.yml");
@@ -74,8 +76,8 @@ export default {
       : [];
     return [
       turn.program ?? findProgram("dsh"),
-      ...patch,
       "headless",
+      ...patch,
       "--json",
       "--permission-mode",
       PRESET[turn.access],
