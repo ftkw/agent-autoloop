@@ -176,6 +176,17 @@ export function jobOf(view: View, run: Row, env: Environment): Job {
         .map(({ id, title, choice, answer, options, decided_at }) => {
           return { card: id, title, choice: choice === null ? answer : JSON.parse(options)[choice], at: decided_at };
         }),
+      // Why this round may be done, in the round's own terms. The rules version is the one the run was queued under, not
+      // whatever is current now: a change made while this round waits must not widen what it may touch. Access comes from
+      // the agent's own registration, and the source from the event, so nothing a source sent can appear here as a grant.
+      mandate: {
+        rulesVersion: run.rules_version,
+        policy: {
+          access: (rules.agents[run.agent] as { access?: string } | undefined)?.access ?? "edit",
+          agent: run.agent,
+        },
+        by: { source: sourceOf(view, run.id) ?? "schedule", rule: run.rule, lane: run.lane },
+      },
     },
   };
 }

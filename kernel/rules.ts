@@ -23,6 +23,8 @@ type RuleOptions = RuleWords & {
   maxActive?: number;
   resume?: boolean;
   emits?: EventFilter;
+  /** Who may set this rule off: the sources whose events it takes. Absent means any source matching by type. */
+  actors?: string[];
 };
 /** Without channels a rule's cards reach the default ones, or every channel if there are none; with them, only those. */
 type Reach = { channels?: string[] };

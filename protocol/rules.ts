@@ -91,6 +91,7 @@ function checkRule(issues: string[], rules: Rules, rule: Rule, names: Set<string
     ["tell", (value) => TELLS.includes(value as string), `只能是 ${TELLS.join("、")}`, true],
     ["emits", isObject, "要是一个对象", true],
     ["channels", isSomeWords, "要是通道编号的列表", true],
+    ["actors", isSomeWords, "要是来源编号的列表", true],
   ]);
   if (isObject(when) && "source" in when) {
     checkFields(issues, `${where}的 when `, when, [
@@ -117,6 +118,14 @@ function checkRule(issues: string[], rules: Rules, rule: Rule, names: Set<string
   }
   for (const channel of isSomeWords(rule.channels) ? (rule.channels as string[]) : []) {
     if (!Object.hasOwn(rules.channels, channel)) issues.push(`${where}的 channels 不是已登记的通道：${channel}`);
+  }
+  // Who may set this rule off. The gate reads the source that sent the event, never what the event says, so words inside an
+  // event cannot widen it. A source named twice is a mistake like any other repetition in this file.
+  for (const actor of isSomeWords(rule.actors) ? (rule.actors as string[]) : []) {
+    if (!Object.hasOwn(rules.sources, actor)) issues.push(`${where}的 actors 不是已登记的来源：${actor}`);
+  }
+  if (isObject(rule) && Array.isArray(rule.actors) && new Set(rule.actors).size !== rule.actors.length) {
+    issues.push(`${where}的 actors 有重复的来源`);
   }
   rule.group ??= rule.name;
   rule.tell ??= "needed";

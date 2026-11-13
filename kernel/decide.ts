@@ -108,6 +108,8 @@ function add(draft: Draft, table: Table, fields: Row) {
 }
 
 const ruleNamed = (draft: Draft, name: string) => ruleOf(draft.rules, name);
+/** Hands a queued run to whichever agent the rules now say, under the version they now are: work that hasn't started takes
+ * its rule as the owner last wrote it. A round already claimed keeps the version it was claimed under. */
 function assignQueued(draft: Draft, run: Row) {
   const config = draft.view.get("config", "rules")!;
   const rule = ruleOf(config.value as Rules, run.rule);
@@ -229,8 +231,13 @@ function ingest(draft: Draft, source: string, given: unknown, sent = false) {
     return { event: existing.id, duplicate: true, ...routingOf(existing) };
   }
   const tooDeep = event.hops > MAX_HOPS;
+  // Who may set a rule off is read from the source that sent the event, never from what the event says: words inside an
+  // event can't widen a rule that names its sources.
   const takes = (rule: Rule) =>
-    eventRule(rule) && rule.when.source === source && typeMatches(rule.when.types, event.type);
+    eventRule(rule) &&
+    rule.when.source === source &&
+    typeMatches(rule.when.types, event.type) &&
+    (!rule.actors || rule.actors.includes(source));
   const matched = tooDeep ? [] : draft.rules.rules.filter(takes);
   // A paused rule doesn't take the event, and nothing is kept back for it: the event is recorded as skipped for it.
   const isPaused = (rule: Rule) => !!pauseOf(draft.view, rule, draft.now);

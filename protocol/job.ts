@@ -46,5 +46,12 @@ export type Job = {
     waiting: { key: string; about: string; at: string }[];
     open: { card: number; title: string; text: string; at: string }[];
     decided: { card: number; title: string; choice: string | null; at: string }[];
+    /** Why this round may be done: the version it was granted under, what it may work with, and who set it off. A record
+     * for the agent to read and for a later round to compare against, never a permission it can widen by reading it. */
+    mandate: {
+      rulesVersion: number;
+      policy: { access: string; agent: string };
+      by: { source: string; rule: string; lane: string };
+    };
   };
 };
