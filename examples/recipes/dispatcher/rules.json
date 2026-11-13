@@ -10,10 +10,10 @@
   },
   "agents": {
     "wb-decide": {
-      "name": "决策（hy4free）",
+      "name": "决策（hy3 x0）",
       "worker": "my-mac",
       "use": "dsh",
-      "model": "workbuddy/hy4free",
+      "model": "workbuddy/hy3",
       "access": "edit",
       "timeout": 30
     },
