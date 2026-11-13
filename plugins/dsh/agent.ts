@@ -4,7 +4,15 @@
 // start another turn, so only `final` says it's over. A resumed session keeps the permissions it was saved with unless told
 // otherwise, so they're given every time; nobody is there to approve anything, so a call that needs it is refused rather than
 // left waiting. It has no desktop session to open.
+//
+// A rule's `model` picks the model for that run. DSH has no --model flag: its model is the `agent-default-model` node of the
+// profile config. When a model is named, this writes a one-node --patch overlay into the run's folder and passes it to dsh.
+// `provider/model` also switches the provider (e.g. the workbuddy / workbuddy-global providers a DSH bundle plugin adds),
+// so one DSH install can run each round on a different model. A resumed session keeps the model it was created with; the
+// patch only sets the default for a new session, so it is harmless on a resume and the command stays identical either way.
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import path from "node:path";
 import { commandLine } from "../../host/command.ts";
 import { findProgram, tail, type Adapter, type Reading, type Usage } from "../../worker/agents.ts";
 import { addUsage } from "../../protocol/validate.ts";
@@ -17,6 +25,27 @@ const WHY_NOT: Record<string, string> = {
   blocked: "这一轮被卡住了，没有完成",
   "max-tokens": "这一轮用完了输出上限",
 };
+
+/** `model-id` keeps DSH's default provider; `provider/model-id` switches both. A bare provider isn't a model selection. */
+function modelOf(named?: string): { provider?: string; model: string } | undefined {
+  const text = named?.trim();
+  if (!text) return undefined;
+  const slash = text.indexOf("/");
+  const provider = slash > 0 ? text.slice(0, slash) : undefined;
+  const model = slash > 0 ? text.slice(slash + 1) : text;
+  return model ? { ...(provider && { provider }), model } : undefined;
+}
+
+/** The --patch overlay that replaces the default model. Values are JSON-quoted, so any model id is safe in YAML.
+ * A patch entry replaces the node's config wholesale, so a bare `model` would drop DSH's default provider: only write
+ * the provider line when the rule named one. */
+function patchFor(selection: { provider?: string; model: string }): string {
+  const config = [
+    ...(selection.provider ? [`    provider: ${JSON.stringify(selection.provider)}`] : []),
+    `    model: ${JSON.stringify(selection.model)}`,
+  ].join("\n");
+  return `- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n  config:\n${config}\n`;
+}
 
 /** dsh reports each step's tokens as inputTokens / outputTokens / cacheReadTokens / cacheWriteTokens. Its inputTokens
  * leave out the cache's reads and writes; `input` counts all of it, as Codex's does. */
@@ -32,17 +61,30 @@ function stepUsage(reported: any): Usage | undefined {
 }
 
 export default {
-  command: (turn) => [
-    turn.program ?? findProgram("dsh"),
-    "headless",
-    "--json",
-    "--permission-mode",
-    PRESET[turn.access],
-    "--approval-policy",
-    "never",
-    ...(turn.resume ? ["--session-id", turn.resume] : []),
-    turn.prompt,
-  ],
+  command: (turn) => {
+    const selection = modelOf(turn.model);
+    // --patch is a launcher flag: it goes before `headless` and before the headless app's own --json.
+    // Without a model the command is exactly what it was, so existing installs keep working untouched.
+    const patch = selection
+      ? (() => {
+          const file = path.join(turn.folder, "dsh-model.yml");
+          writeFileSync(file, patchFor(selection), { mode: 0o600 });
+          return ["--patch", file];
+        })()
+      : [];
+    return [
+      turn.program ?? findProgram("dsh"),
+      ...patch,
+      "headless",
+      "--json",
+      "--permission-mode",
+      PRESET[turn.access],
+      "--approval-policy",
+      "never",
+      ...(turn.resume ? ["--session-id", turn.resume] : []),
+      turn.prompt,
+    ];
+  },
   read(stdout, code, stderr) {
     let session: string | undefined;
     let final: { text?: unknown; reason?: { kind?: string; error?: { message?: string } } | null } | undefined;

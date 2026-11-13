@@ -1,0 +1,94 @@
+{
+  "timezone": "Asia/Shanghai",
+  "sources": {
+    "dispatch": { "name": "决策派单" },
+    "inbox": { "name": "外部任务入口" }
+  },
+  "agents": {
+    "wb-decide": {
+      "name": "决策（WorkBuddy 国内版 GLM-5.3）",
+      "worker": "my-mac",
+      "use": "dsh",
+      "model": "workbuddy/GLM-5.3",
+      "access": "edit",
+      "timeout": 30
+    },
+    "wb-worker": {
+      "name": "干活（WorkBuddy 国内版 DeepSeek-V4-Pro）",
+      "worker": "my-mac",
+      "use": "dsh",
+      "model": "workbuddy/DeepSeek-V4-Pro",
+      "access": "edit",
+      "timeout": 60
+    },
+    "qoder-worker": {
+      "name": "干活（WorkBuddy 国际版 Kimi-K3）",
+      "worker": "my-mac",
+      "use": "dsh",
+      "model": "workbuddy-global/Kimi-K3",
+      "access": "edit",
+      "timeout": 60
+    },
+    "loomy-worker": {
+      "name": "干活（WorkBuddy 国际版 GPT-5.6）",
+      "worker": "my-mac",
+      "use": "dsh",
+      "model": "workbuddy-global/GPT-5.6",
+      "access": "edit",
+      "timeout": 60
+    }
+  },
+  "channels": {
+    "desktop": { "name": "桌面通知" }
+  },
+  "askFirst": ["删数据", "重启服务", "花钱", "对外发消息"],
+  "rules": [
+    {
+      "name": "每日决策派单",
+      "when": { "cron": "0 9 * * *" },
+      "to": "wb-decide",
+      "cwd": "/绝对路径/work",
+      "skill": "task-dispatcher",
+      "tell": "always",
+      "emits": { "source": "dispatch", "types": ["task.wb", "task.qoder", "task.loomy"] },
+      "group": "decide",
+      "parallel": 1,
+      "maxActive": 1
+    },
+    {
+      "name": "外部任务决策派单",
+      "when": { "source": "inbox", "types": ["work.*"] },
+      "to": "wb-decide",
+      "cwd": "/绝对路径/work",
+      "skill": "task-dispatcher",
+      "emits": { "source": "dispatch", "types": ["task.wb", "task.qoder", "task.loomy"] },
+      "group": "decide",
+      "parallel": 1,
+      "maxActive": 1
+    },
+    {
+      "name": "派给 WorkBuddy",
+      "when": { "source": "dispatch", "types": ["task.wb"] },
+      "to": "wb-worker",
+      "cwd": "/绝对路径/work",
+      "prompt": "读 context.json 的资料，完成这件事并回报结论。",
+      "parallel": 2
+    },
+    {
+      "name": "派给 Qoder",
+      "when": { "source": "dispatch", "types": ["task.qoder"] },
+      "to": "qoder-worker",
+      "cwd": "/绝对路径/work",
+      "prompt": "读 context.json 的资料，完成这件事并回报结论。",
+      "parallel": 2
+    },
+    {
+      "name": "派给 Loomy",
+      "when": { "source": "dispatch", "types": ["task.loomy"] },
+      "to": "loomy-worker",
+      "cwd": "/绝对路径/work",
+      "prompt": "读 context.json 的资料，完成这件事并回报结论。",
+      "parallel": 2
+    }
+  ]
+}

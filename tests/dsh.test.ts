@@ -8,7 +8,7 @@
 // this test's own instead of whatever this machine has installed.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -80,6 +80,52 @@ test("DSH: access is the permission preset every time, nothing waits for approva
     "session-1",
     "做这件事",
   ]);
+});
+
+test("DSH: a rule's model becomes a --patch overlay, and a round with no model keeps the old command", () => {
+  const folder = mkdtempSync(join(scratch, "model-"));
+  try {
+    // No model: byte-for-byte the command this plugin always produced.
+    assert.deepEqual(dsh.command({ ...turn, folder }), [
+      program,
+      "headless",
+      "--json",
+      "--permission-mode",
+      "workspace-write",
+      "--approval-policy",
+      "never",
+      "做这件事",
+    ]);
+    // A bare model id keeps DSH's default provider: the patch must not write a provider line.
+    const bare = dsh.command({ ...turn, folder, model: "GLM-5.3" });
+    assert.deepEqual(bare.slice(0, 3), [program, "--patch", join(folder, "dsh-model.yml")]);
+    assert.deepEqual(bare.slice(3), [
+      "headless",
+      "--json",
+      "--permission-mode",
+      "workspace-write",
+      "--approval-policy",
+      "never",
+      "做这件事",
+    ]);
+    assert.equal(
+      readFileSync(join(folder, "dsh-model.yml"), "utf8"),
+      "- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n  config:\n    model: \"GLM-5.3\"\n",
+    );
+    // provider/model switches both, so WorkBuddy's two regions can be chosen per rule.
+    dsh.command({ ...turn, folder, model: "workbuddy-global/GPT-5.6" });
+    assert.equal(
+      readFileSync(join(folder, "dsh-model.yml"), "utf8"),
+      "- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n" +
+        '  config:\n    provider: "workbuddy-global"\n    model: "GPT-5.6"\n',
+    );
+    // A resumed round carries the same patch: it only sets a new session's default, so it cannot change the model.
+    const resumed = dsh.command({ ...turn, folder, model: "workbuddy/GLM-5.3", resume: "session-1" });
+    assert.deepEqual(resumed.slice(0, 3), [program, "--patch", join(folder, "dsh-model.yml")]);
+    assert.deepEqual(resumed.slice(-3), ["--session-id", "session-1", "做这件事"]);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 const lines = (...events: object[]) => events.map((event) => JSON.stringify(event)).join("\n");

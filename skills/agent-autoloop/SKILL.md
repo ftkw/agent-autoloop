@@ -81,7 +81,7 @@ Windows 的 `cwd` 可写 `C:/code/project`、JSON 转义后的 `C:\\code\\projec
 
 ACP 用 `use: "acp"` 和 `command: ["ACP 服务程序"]`，比如 Gemini CLI 是 `["gemini", "--acp"]`、OpenCode 是 `["opencode", "acp"]`，支持 v1 的会话新建、恢复、文字与一次性权限请求；先在该 Agent 自己的 CLI 登录。`access` 只管 Agent 主动来问的操作，规范允许它不询问就执行，要限制得用它自己的模式（比如 `command` 里写 `env INITIAL_AGENT_MODE=read-only …`）；`model`、`effort`、`tier` 不生效，要在 Agent 自己那边设置。普通命令接法与实测支持范围见 README。
 
-DeepSeek Harness 用 `use: "dsh"`，要 0.2.2 或更新（`npm install -g @deepseek-ai/dsh@next --allow-scripts=koffi,node-pty,@deepseek-ai/dsh-subprocess-local`，不放行这三个包的安装脚本，装完一跑就出错），能续接原会话、上报 Token（不报费用），报 `MISSING_CREDENTIAL` 时把密钥放进环境变量，`access` 对应它的权限档位；旧版用 README 里的普通命令接法。没有可打开的桌面链接。
+DeepSeek Harness 用 `use: "dsh"`，要 0.2.2 或更新（`npm install -g @deepseek-ai/dsh@next --allow-scripts=koffi,node-pty,@deepseek-ai/dsh-subprocess-local`，不放行这三个包的安装脚本，装完一跑就出错），能续接原会话、上报 Token（不报费用），报 `MISSING_CREDENTIAL` 时把密钥放进环境变量，`access` 对应它的权限档位；旧版用 README 里的普通命令接法。`model` 给这一轮选模型：`model-id` 沿用 DSH 默认提供方，`provider/model-id` 连提供方一起换（如 `workbuddy/GLM-5.3`、`workbuddy-global/GPT-5.6`），插件写一个 `--patch` 覆盖 `agent-default-model`；不写 `model` 时命令和以前一样，续接的会话仍用它建会话时那个模型。想让决策和干活各用不同模型，就给不同 Agent 定义写不同 `model`，见 [dispatcher 示例](../../examples/recipes/dispatcher/README.md)。没有可打开的桌面链接。
 
 ZCode 用 `use: "zcode"`，跑随桌面版装的 CLI；Windows 上 `"program"` 指向它的 `zcode.cjs`，插件用 node 启动。能续接原会话、上报 Token（不报费用），`access` 对应它的模式（`read` 是 `plan`，`edit` 是 `edit`，`full` 是 `yolo`）；`model`、`effort` 用 ZCode 自己的设置。先跑一次 `zcode -p "hi"`，返回空就在 ZCode 里换一个能用的模型提供方。没有可打开的桌面链接。
 
