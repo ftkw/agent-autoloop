@@ -26,11 +26,14 @@ const WHY_NOT: Record<string, string> = {
   "max-tokens": "这一轮用完了输出上限",
 };
 
-/** `model-id` keeps DSH's default provider; `provider/model-id` switches both. A bare provider isn't a model selection. */
+/** `model-id` keeps DSH's default provider; `provider/model-id` switches both. The provider may
+ * itself contain slashes — a bundle plugin's route is an id path like `@loomy/dsh-loomy/loomy` —
+ * so the split is at the LAST slash and everything before it is the provider. A bare provider
+ * isn't a model selection. */
 function modelOf(named?: string): { provider?: string; model: string } | undefined {
   const text = named?.trim();
   if (!text) return undefined;
-  const slash = text.indexOf("/");
+  const slash = text.lastIndexOf("/");
   const provider = slash > 0 ? text.slice(0, slash) : undefined;
   const model = slash > 0 ? text.slice(slash + 1) : text;
   return model ? { ...(provider && { provider }), model } : undefined;

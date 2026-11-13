@@ -120,6 +120,14 @@ test("DSH: a rule's model becomes a --patch overlay, and a round with no model k
       "- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n" +
         '  config:\n    provider: "workbuddy-global"\n    model: "GPT-5.6"\n',
     );
+    // A provider route may itself carry slashes (a bundle plugin's id path, e.g.
+    // @loomy/dsh-loomy/loomy): the split is at the last slash, so the whole path is the provider.
+    dsh.command({ ...turn, folder, model: "@loomy/dsh-loomy/loomy/spark-x2.6" });
+    assert.equal(
+      readFileSync(join(folder, "dsh-model.yml"), "utf8"),
+      "- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n" +
+        '  config:\n    provider: "@loomy/dsh-loomy/loomy"\n    model: "spark-x2.6"\n',
+    );
     // A resumed round carries the same patch: it only sets a new session's default, so it cannot change the model.
     const resumed = dsh.command({ ...turn, folder, model: "workbuddy/GLM-5.3", resume: "session-1" });
     assert.equal(resumed.indexOf("--patch") > resumed.indexOf("headless"), true, "patch follows the profile name");
