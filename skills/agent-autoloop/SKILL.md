@@ -104,6 +104,8 @@ Claude 主任务要委托 Codex 操作网页时，从 `examples/recipes/browser-
 "channels": { "feishu": { "key": "…", "user": "ou_用户的 open_id" } }
 ```
 
+同一个飞书应用的卡片点击只能有一个监听，只在一台电脑上跑。卡片默认私发给通道的 `user`；发给群聊再 @ 一个人，在 `config.json` 多写两项：`"chat": "oc_群的chat_id"`（发送目标改成群）和 `"mention": "ou_要@的人"`（卡片顶部加 @ 标记）；只写 `chat` 不写 `mention`，卡片文字会以纯文字写明是发给谁的。应用凭据也可不走 `config init` 扫码，而是用环境变量 `LARKSUITE_CLI_APP_ID` / `LARKSUITE_CLI_APP_SECRET`（或 `LARKSUITE_CLI_TENANT_ACCESS_TOKEN`）直供，适合 CI 或没有图形界面登录的环境；把 `lark` 指向一个自己写的包装脚本即可。
+
 同一个飞书应用的卡片点击只能有一个监听，只在一台电脑上跑。
 
 **只会发文字的（钉钉、企微的群机器人，Slack、Discord 的 Webhook）**：用 `plugins/webhook/channel.ts`，`config.json` 的通道项写 `"use": "webhook"`、`"platform": "dingtalk"` 和 `"url": "已有的 Webhook 地址"`；平台也可选 `wecom`、`slack`、`discord`。别的平台只要收 JSON POST 也能接：不写 `platform`，写 `url` 和带 `{text}` 的 `body`，比如 Telegram 写 `"url": "https://api.telegram.org/bot<机器人令牌>/sendMessage"`、`"body": { "chat_id": "…", "text": "{text}" }`。`rules.json` 里写 `"links": true`，卡片链接本身就能回答；`config.json` 的 `hub.publicUrl` 要配成手机或电脑能打开的地址。

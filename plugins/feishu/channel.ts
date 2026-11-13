@@ -26,8 +26,9 @@ function outcomeOf(card: Card) {
   return card.state === "closed" && card.result ? card.result : null;
 }
 
-/** One card, as it looks now: the options while it's open, what became of it after. */
-export function render(card: Card) {
+/** One card, as it looks now: the options while it's open, what became of it after.
+ * `mention` is the person a group card wakes: the markup Feishu's markdown renders as an @, or plain words. */
+export function render(card: Card, mention?: string) {
   const outcome = outcomeOf(card);
   // Each option is a block across the card, its words wrapping: buttons in a row, one line high, cut long options off.
   const option = (label: string, index: number) => ({
@@ -78,6 +79,9 @@ export function render(card: Card) {
       ],
     },
   ];
+  // A group card wakes the person named: the markup Feishu renders as an @, ahead of the card's own words, so it stands
+  // out at the top of the message. Without a mention configured, the words say whom the card is for in plain text.
+  const mentionLine = mention ? [{ tag: "markdown", content: `<at id=${mention}></at>` }] : [];
   return {
     schema: "2.0",
     config: { update_multi: true, enable_forward: false },
@@ -91,6 +95,7 @@ export function render(card: Card) {
     },
     body: {
       elements: [
+        ...mentionLine,
         ...(card.text ? [{ tag: "markdown", content: card.text }] : []),
         ...(card.state === "open"
           ? [...(notice ? textForm : []), ...card.options.map(option), ...(notice ? [] : textForm)]
@@ -102,6 +107,9 @@ export function render(card: Card) {
 
 export default async function feishu({ hub, options, log, signal }: ChannelContext) {
   const program = (options.lark as string | undefined) ?? "lark-cli";
+  // A group card is addressed to the chat, not the channel's own user; the mention wakes the one person it's for.
+  const chat = options.chat as string | undefined;
+  const mention = options.mention as string | undefined;
   const lark = async (args: string[], input?: string) => {
     const printed = await new Promise<string>((resolve, reject) => {
       const child = execFile(
@@ -126,7 +134,9 @@ export default async function feishu({ hub, options, log, signal }: ChannelConte
 
   /** Sends the card's words as a new message, or hands back the one an earlier try with this key already made. */
   async function sendMessage(key: string, content: string) {
-    const target = ["--user-id", owner, "--as", "bot", "--msg-type", "interactive"];
+    const target = chat
+      ? ["--chat-id", chat, "--as", "bot", "--msg-type", "interactive"]
+      : ["--user-id", owner, "--as", "bot", "--msg-type", "interactive"];
     const once = ["--idempotency-key", key];
     return (await lark(["im", "+messages-send", ...target, ...once, "--content", content])).data.message_id as string;
   }
@@ -143,7 +153,18 @@ export default async function feishu({ hub, options, log, signal }: ChannelConte
       }
       if (!card) continue;
       try {
-        const content = JSON.stringify(render(card));
+        // A card to a group reaches many people: with a mention the @ markup wakes the one it's for; without one, the
+        // words say whom it's for in plain text, since the markup would only show as words on its own. A private card
+        // is already the person's own, so it says nothing of the kind.
+        const card_json = render(card, chat ? mention : undefined);
+        const content = JSON.stringify(
+          chat && !mention
+            ? {
+                ...card_json,
+                body: { elements: [{ tag: "markdown", content: `@${owner}` }, ...card_json.body.elements] },
+              }
+            : card_json,
+        );
         let ref = card.ref;
         if (ref) {
           try {

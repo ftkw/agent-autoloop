@@ -9,6 +9,8 @@
 // An ask card that only takes choices loses the account someone would type; words without a choice must still answer.
 // A U+2028 or U+2029 in what someone typed, which JSON leaves as it is, cuts the click's line and loses the click.
 // Older lark-cli releases reject `--content -`, so a first card must not depend on that stdin convention.
+// A card meant for a group carries the chat's id in the send and the person to wake in the card's words; a channel
+// configured for a group but without a mention says so, and one that says nothing stays a private message.
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -575,4 +577,75 @@ test("feishu: an open card that can't be updated isn't sent again, and a first m
   const [send] = first.lines.filter((l) => l.includes("+messages-send"));
   assert.ok(send.includes("--idempotency-key agent-autoloop-card-5 "), send);
   assert.deepEqual(first.calls, [["delivered", 5, 3, "om_new"]]);
+});
+
+/** A Feishu channel pointed at a group chat: the sends it made, read back from the lark-cli stand-in's log. */
+async function groupSends(options: Record<string, unknown>) {
+  const log = join(dir, "lark-group.log");
+  const lark = join(dir, "lark-cli-group");
+  rmSync(log, { force: true });
+  writeFileSync(
+    lark,
+    `#!/bin/sh
+echo "$*" >> "${log}"
+case "$*" in
+  *"event consume"*) exec sleep 30 ;;
+  *"+messages-send"*) cat > /dev/null; echo '{"ok":true,"data":{"message_id":"om_5"}}' ;;
+esac
+`,
+  );
+  chmodSync(lark, 0o755);
+  const stop = new AbortController();
+  const cards: Card[] = [{ ...base, version: 1, ref: null }];
+  const calls: unknown[][] = [];
+  const hub = {
+    async nextCard() {
+      if (cards.length) return { card: cards.shift()! };
+      stop.abort();
+      return { card: null };
+    },
+    async delivered(...args: unknown[]) {
+      calls.push(["delivered", ...args]);
+      return {};
+    },
+    async failed() {
+      return {};
+    },
+    async answer() {
+      return {};
+    },
+  };
+  await feishu({ hub: hub as any, options: { user: "ou_me", lark, ...options }, log: () => {}, signal: stop.signal });
+  return { lines: readFileSync(log, "utf8").trim().split("\n"), calls };
+}
+
+test("feishu: a card for a group is sent to the chat and wakes the person named", async () => {
+  // Failure this guards: with a chat configured, the card still goes as a private message to the channel's own user, or
+  // reaches the chat without the mention that tells the one person it's for.
+  const { lines, calls } = await groupSends({ chat: "oc_group", mention: "ou_bingyang" });
+  const [send] = lines.filter((l) => l.includes("+messages-send"));
+  assert.ok(send.includes("--chat-id oc_group"), send);
+  assert.ok(!send.includes("--user-id"), "a group card is addressed to the chat, not a person");
+  // The mention is a markup the card's markdown renders, checked before the card's own words.
+  assert.ok(send.includes("<at id=ou_bingyang></at>"), send);
+  assert.deepEqual(calls, [["delivered", 5, 1, "om_5"]]);
+});
+
+test("feishu: a group card without a mention says whom it's for in plain words", async () => {
+  // Failure this guards: the mention markup is missing, so the one person the card is for gets nothing that wakes them.
+  const { lines } = await groupSends({ chat: "oc_group" });
+  const [send] = lines.filter((l) => l.includes("+messages-send"));
+  assert.ok(send.includes("--chat-id oc_group"), send);
+  assert.ok(send.includes("@ou_me"), send);
+  assert.ok(!send.includes("<at id="), "no mention markup is invented");
+});
+
+test("feishu: with no chat configured the card stays a private message, mention markup and all", async () => {
+  // Failure this guards: a group that was configured and then taken away still sends to the old chat, or the mention
+  // leaks into a private message where it renders as plain words.
+  const { lines } = await groupSends({});
+  const [send] = lines.filter((l) => l.includes("+messages-send"));
+  assert.ok(send.includes("--user-id ou_me"), send);
+  assert.ok(!send.includes("--chat-id"), send);
+  assert.ok(!send.includes("<at id="), send);
 });
