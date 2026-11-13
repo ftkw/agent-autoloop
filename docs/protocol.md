@@ -81,6 +81,7 @@
       "tell": "needed", // always 每轮做成都发（没事可做、没跑成不发）/ needed 只在有卡片时（默认）/ never 只压住回执里的通知，提问和中台自己的告警照发
       "emits": { "source": "shop", "types": ["pr.*"] }, // 回执里能发什么事件，不写就不能发
       "channels": ["feishu"], // 这条规则的卡片和通知只发到这几个通道，不写就照 defaultChannels
+      "actors": ["shop"], // 只认这几个来源发的事件，不写就认所有 when.source 匹配的；写错的来源算规则错误
     },
   ],
   "elsewhere": [
@@ -204,7 +205,12 @@ GET /v1/work?claim=<这次领活的编号>&wait=50&running=7,8&capacity=1    Aut
     "timers":  [{ "key", "about", "at" }],                                               // 这一轮到期的复查
     "waiting": [{ "key", "about", "at" }],                                               // 这个事项还没到期的复查
     "open":    [{ "card", "title", "text", "at" }],                                      // 同来源同组还没收尾的卡片
-    "decided": [{ "card", "title", "choice", "at" }]                                     // 这个事项定过的事，只对当时那件事有效；choice 已是所选那项的文字，不是下标
+    "decided": [{ "card", "title", "choice", "at" }],                                    // 这个事项定过的事，只对当时那件事有效；choice 已是所选那项的文字，不是下标
+    "mandate": {                                                                          // 这一轮凭什么可以做：授权锚点，给 Agent 读，也给以后核对
+      "rulesVersion": 150,                                                                // 这一轮跑在哪个规则版本下
+      "policy": { "access": "edit", "agent": "wb-worker" },                               // 那个版本给这个 Agent 的权限
+      "by": { "source": "dispatch", "rule": "派给 WorkBuddy", "lane": "" }                // 哪条来源、哪条规则、哪个事项把它叫起来
+    }
   }
 }
 ```
